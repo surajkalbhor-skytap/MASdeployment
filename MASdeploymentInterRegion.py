@@ -55,7 +55,7 @@ headers = {
 }
 BASE_URL = "https://cloud.skytap.com"
 
-# Iteration file will be saved in the same directory as the log file.
+# The iteration file is saved in the same logs directory with the same base name.
 def get_iteration_filepath(iter_num):
     return os.path.join(log_dir, f"{iter_num}.json")
 
@@ -130,16 +130,20 @@ def get_configuration_mas_groups(configuration_id):
     logger.info("MAS groups in destination configuration %s: %s", configuration_id, new_mas_ids)
     return new_mas_ids
 
-def delete_destination_mas_groups(vm_id, mas_ids):
+def delete_destination_mas_groups(vm_id, mas_ids, attached_mas_ids):
+    """Detach only MAS groups that are attached to the destination VM."""
     for mas_id in mas_ids:
-        url = f"{BASE_URL}/multi_attach_storage_groups/{mas_id}/vm_attachments.json"
-        payload = {"vm_ids": [vm_id]}
-        logger.info("Detaching MAS group %s from destination VM %s.", mas_id, vm_id)
-        resp = requests.delete(url, headers=headers, json=payload)
-        if resp.status_code == 200:
-            logger.info("Successfully detached MAS group %s from VM %s.", mas_id, vm_id)
+        if mas_id in attached_mas_ids:
+            url = f"{BASE_URL}/multi_attach_storage_groups/{mas_id}/vm_attachments.json"
+            payload = {"vm_ids": [vm_id]}
+            logger.info("Detaching MAS group %s from destination VM %s.", mas_id, vm_id)
+            resp = requests.delete(url, headers=headers, json=payload)
+            if resp.status_code == 200:
+                logger.info("Successfully detached MAS group %s from VM %s.", mas_id, vm_id)
+            else:
+                logger.error("Failed to detach MAS group %s; status: %s.", mas_id, resp.status_code)
         else:
-            logger.error("Failed to detach MAS group %s; status: %s.", mas_id, resp.status_code)
+            logger.info("MAS group %s is not attached to VM %s; skipping detachment.", mas_id, vm_id)
 
 def delete_mas_group(mas_id):
     url = f"{BASE_URL}/multi_attach_storage_groups/{mas_id}"
@@ -317,7 +321,7 @@ def main():
         if same_region:
             logger.info("Same-region detected; destination VM shutdown will occur after template creation.")
         else:
-            logger.info("Different-region detected; destination VM remains running until resumption.")
+            logger.info("Different-region detected; destination VM remains running until resumed deployment.")
         
         dest_old_mas = extract_mas_groups(destination_vm_payload)
         iteration_data.update({"dest_vm_mas": dest_old_mas})
@@ -359,11 +363,10 @@ def main():
             logger.info("After template copy is complete, resume deployment using option 2 with iteration number %s.", iter_num)
             sys.exit(1)
         
-        # Save iteration file for same-region even though all steps occur in one go.
         save_iteration_data(iter_num, iteration_data)
         
-        # For same-region deployment:
-        delete_destination_mas_groups(destination_vm_id, old_config_mas); wait(5)
+        # For same-region deployment, shut down has already been performed above.
+        delete_destination_mas_groups(destination_vm_id, old_config_mas, dest_old_mas); wait(5)
         for mas in dest_old_mas:
             delete_mas_group(mas); wait(5)
         template_to_deploy = destination_template if destination_template else source_template
@@ -378,7 +381,7 @@ def main():
         if destination_template:
             delete_template(destination_template); wait(5)
         retry_step(update_vm_runstate, dest_config_id, destination_vm_id, "running"); wait(5)
-        save_iteration_data(iter_num, iteration_data)  # Update iteration file with final state
+        save_iteration_data(iter_num, iteration_data)
         logger.info("Script completed successfully.")
     
     elif activity_type == "2":
@@ -410,7 +413,7 @@ def main():
             logger.error("Failed to shutdown destination VM. Exiting.")
             sys.exit(1)
         
-        delete_destination_mas_groups(destination_vm_id, old_config_mas); wait(5)
+        delete_destination_mas_groups(destination_vm_id, old_config_mas, dest_old_mas); wait(5)
         for mas in dest_old_mas:
             delete_mas_group(mas); wait(5)
         retry_step(deploy_mas_template, dest_config_id, destination_template); wait(5)
