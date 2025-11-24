@@ -30,20 +30,8 @@ ch.setLevel(logging.INFO)
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
-# -------------------------------------------
-# Load credentials from file.
-# -------------------------------------------
-cred_file = os.path.join(script_dir, "credentials.json")
-if not os.path.exists(cred_file):
-    logger.error("Credentials file 'credentials.json' not found in script directory.")
-    sys.exit(1)
-with open(cred_file, 'r') as f:
-    creds = json.load(f)
-username = creds.get("username")
-token = creds.get("token")
-if not username or not token:
-    logger.error("Username or token not found in credentials file.")
-    sys.exit(1)
+username = input("Enter your Skytap Username: ").strip()
+token = input("Enter your Skytap Token: ").strip()
 
 # -------------------------------------------
 # Global configuration.
