@@ -9,16 +9,23 @@ def check_python_version():
 def check_module(module_name, package_name=None):
     try:
         __import__(module_name)
-        print(f"Module '{module_name}' is installed.")
+        print(f"Module '{module_name}' is already installed.")
     except ImportError:
-        print(f"Module '{module_name}' is not installed. Installing...")
+        print(f"Module '{module_name}' is not installed. Attempting to install...")
         if not package_name:
             package_name = module_name
-        subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
-        print(f"Module '{module_name}' has been installed.")
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", package_name])
+            print(f"Module '{module_name}' installed successfully.")
+        except subprocess.CalledProcessError as e:
+            print("Automatic installation failed due to an externally-managed environment.")
+            print("Please create a virtual environment and install dependencies manually:")
+            print("   python3 -m venv venv")
+            print("   source venv/bin/activate")
+            print("   pip install requests")
+            sys.exit(1)
 
 if __name__ == "__main__":
     check_python_version()
-    # Only 'requests' is external; others are built-in.
     check_module("requests")
     print("All dependencies are met.")
