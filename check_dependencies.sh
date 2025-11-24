@@ -66,7 +66,7 @@ pip install --upgrade pip
 if ! python3 -c "import requests" 2>/dev/null; then
     echo "Module 'requests' is not installed. Attempting to install..."
     # Try installing the module in the user directory.
-    if ! pip install --user requests; then
+    if ! pip install requests; then
         echo "Automatic installation failed."
         echo "If you are using a system where Python is externally managed (e.g., Homebrew on macOS),"
         echo "please create a virtual environment and install dependencies manually:"
